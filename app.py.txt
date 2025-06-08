@@ -1,0 +1,66 @@
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+
+# --- Page setup ---
+st.set_page_config(page_title="Stock Price Predictor", page_icon="??", layout="centered")
+st.title("?? AI Stock Price Predictor")
+st.markdown("Predict future stock prices using machine learning (Linear Regression model).")
+
+# --- User input ---
+ticker = st.text_input("Enter Stock Ticker (e.g., AAPL or RELIANCE.NS)", "AAPL")
+start_date = st.date_input("Start Date", pd.to_datetime("2022-01-01"))
+end_date = st.date_input("End Date", pd.to_datetime("today"))
+predict_days = st.slider("Days to Predict", 5, 60, 30)
+
+# --- When button clicked ---
+if st.button("Predict"):
+    with st.spinner("Fetching data and training model..."):
+        # Download historical data
+        data = yf.download(ticker, start=start_date, end=end_date)
+        
+        if data.empty:
+            st.error("?? No data found. Try a different ticker or date range.")
+        else:
+            st.subheader("?? Historical Data")
+            st.dataframe(data.tail())
+
+            # Prepare data
+            data = data.reset_index()
+            data['Days'] = (data['Date'] - data['Date'].min()).dt.days
+            X = data[['Days']]
+            y = data['Close']
+
+            # Train simple Linear Regression model
+            model = LinearRegression()
+            model.fit(X, y)
+
+            # Predict future prices
+            future_days = np.arange(data['Days'].max() + 1, data['Days'].max() + predict_days + 1).reshape(-1, 1)
+            future_prices = model.predict(future_days)
+            future_dates = pd.date_range(start=data['Date'].max() + pd.Timedelta(days=1), periods=predict_days)
+
+            # Plot
+            fig, ax = plt.subplots()
+            ax.plot(data['Date'], y, label="Historical", linewidth=2)
+            ax.plot(future_dates, future_prices, label="Predicted", linestyle="--", color="orange")
+            ax.set_xlabel("Date")
+            ax.set_ylabel("Stock Price")
+            ax.set_title(f"{ticker.upper()} Price Prediction")
+            ax.legend()
+            st.pyplot(fig)
+
+            # Show prediction table
+            prediction_df = pd.DataFrame({
+                'Date': future_dates,
+                'Predicted Price': future_prices
+            })
+            st.subheader("?? Prediction Table")
+            st.dataframe(prediction_df.set_index('Date'))
+
+# --- Footer ---
+st.markdown("---")
+st.markdown("Made with ?? using Streamlit and yFinance")
